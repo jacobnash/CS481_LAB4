@@ -49,23 +49,30 @@ void wait_for_elevator(Person *p)
     // remove the critical section
     pthread_mutex_unlock(p->es->lock);
     // block on the persons varible
+    pthread_mutex_lock(p->lock);
     pthread_cond_wait(p->cond, p->lock);
-    // Signal the condition variable for blocking elevators. Block on the person’s condition variable.
+    pthread_mutex_unlock(p->lock);
 }
 
 void wait_to_get_off_elevator(Person *p)
 {
     //Unblock the elevator’s condition variable block on the person’s condition variable.
+    pthread_mutex_lock(p->e->lock);
     pthread_cond_signal(p->e->cond);
+    pthread_mutex_unlock(p->e->lock);
     // block on the persons condtional
+    pthread_mutex_lock(p->lock);
     pthread_cond_wait(p->cond, p->lock);
+    pthread_mutex_unlock(p->lock);
 
 }
 
 void person_done(Person *p)
 {
     //signal to the elevator. 
+    pthread_mutex_lock(p->e->lock);
     pthread_cond_signal(p->e->cond);
+    pthread_mutex_unlock(p->e->lock);
 }
 //Each elevator is a while loop. 
 //Check the global list and if it’s empty, block on the condition variable for blocking elevators. 
@@ -94,34 +101,38 @@ void *elevator(void *arg)
         }
         else
             dll_delete_node(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers));
-    // unlock the critial section.
-    pthread_mutex_unlock(((Elevator*)arg)->es->lock);
-    //move the elevator.
-    person_in_transit->from == ((Elevator*)arg)->onfloor?:move_to_floor(((Elevator*)arg), person_in_transit->from);
-    //open the door
-    open_door(((Elevator*)arg));
-    //add the people to the elevator
-    person_in_transit->e = ((Elevator*)arg); 
-    //signal the person
-    pthread_cond_signal(person_in_transit->cond);
-    // have the elevator wait
-    pthread_cond_wait(((Elevator*)arg)->cond, ((Elevator*)arg)->lock);
-    // this is needed because i am using the wait as a hold.... i dont know if i can use null
-    pthread_mutex_unlock(((Elevator*)arg)->lock);
-    // close door 
-    close_door(((Elevator*)arg));
-    // elevator moves
-    move_to_floor(person_in_transit->e,person_in_transit->to);
-    // open the door once move has completed.
-    open_door(((Elevator*)arg));
-    // signal the person
-    pthread_cond_signal(person_in_transit->cond);
-    // block the elevator
-    pthread_cond_wait(((Elevator*)arg)->cond, ((Elevator*)arg)->lock);
-    // unlock once the block is competed.
-    pthread_mutex_unlock(((Elevator*)arg)->lock);
-    // close the door
-    close_door(((Elevator*)arg));
-    // restart. 
-}
+        // unlock the critial section.
+        pthread_mutex_unlock(((Elevator*)arg)->es->lock);
+        //move the elevator.
+        person_in_transit->from == ((Elevator*)arg)->onfloor?:move_to_floor(((Elevator*)arg), person_in_transit->from);
+        //open the door
+        open_door(((Elevator*)arg));
+        //add the people to the elevator
+        person_in_transit->e = ((Elevator*)arg); 
+        //signal the person
+        pthread_mutex_lock(person_in_transit->lock);
+        pthread_cond_signal(person_in_transit->cond);
+        pthread_mutex_unlock(person_in_transit->lock);
+        // have the elevator wait
+        pthread_mutex_lock(((Elevator*)arg)->lock);
+        pthread_cond_wait(((Elevator*)arg)->cond, ((Elevator*)arg)->lock);
+        pthread_mutex_unlock(((Elevator*)arg)->lock);
+        // close door 
+        close_door(((Elevator*)arg));
+        // elevator moves
+        move_to_floor(person_in_transit->e,person_in_transit->to);
+        // open the door once move has completed.
+        open_door(((Elevator*)arg));
+        // signal the person
+        pthread_mutex_lock(person_in_transit->lock);
+        pthread_cond_signal(person_in_transit->cond);
+        pthread_mutex_unlock(person_in_transit->lock);
+        // block the elevator
+        pthread_mutex_lock(((Elevator*)arg)->lock);
+        pthread_cond_wait(((Elevator*)arg)->cond, ((Elevator*)arg)->lock);
+        pthread_mutex_unlock(((Elevator*)arg)->lock);
+        // close the door
+        close_door(((Elevator*)arg));
+        // restart. 
+    }
 }
