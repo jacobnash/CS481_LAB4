@@ -40,19 +40,18 @@ void initialize_person(Person *e)
 
 void wait_for_elevator(Person *p)
 {
-
-    pthread_mutex_lock(p->lock);
+    
     dll_append( ((Queue*)p->es->v)->passengers, new_jval_v(p));
-    pthread_mutex_unlock(p->lock);
+    pthread_cond_signal(((Queue*)p->es->v)->cond);
     pthread_cond_wait(p->cond, p->lock);
     // Signal the condition variable for blocking elevators. Block on the person’s condition variable.
-    pthread_cond_signal(p->e->cond);
 }
 
 void wait_to_get_off_elevator(Person *p)
 {
     //Unblock the elevator’s condition variable block on the person’s condition variable.
     // block on the persons condtional
+    pthread_cond_signal(p->e->cond);
     pthread_cond_wait(p->cond, p->lock);
     
 }
@@ -75,28 +74,28 @@ void *elevator(void *arg)
 {
     for (;;)
     {
+            pthread_mutex_lock(((Elevator*)arg)->es->lock);
         Person *person_in_transit = (Person*)jval_v(dll_val(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers)));
         if (!person_in_transit){
-            //pthread_mutex_lock(((Elevator*)arg)->lock);
-        }
-        else
-        {
+            pthread_cond_wait(((Queue*)((Elevator*)arg)->es->v)->cond, ((Elevator*)arg)->es->lock);
+        } 
             person_in_transit = (Person*)jval_v(dll_val(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers)));
             dll_delete_node(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers));
-            person_in_transit->e = ((Elevator*)arg); 
+            pthread_mutex_unlock(((Elevator*)arg)->es->lock);
             person_in_transit->from == ((Elevator*)arg)->onfloor?:move_to_floor(((Elevator*)arg), person_in_transit->from);
             open_door(((Elevator*)arg));
+            person_in_transit->e = ((Elevator*)arg); 
             pthread_cond_signal(person_in_transit->cond);
             pthread_cond_wait(((Elevator*)arg)->cond, ((Elevator*)arg)->lock);
             pthread_mutex_unlock(((Elevator*)arg)->lock);
             close_door(((Elevator*)arg));
-            move_to_floor(((Elevator*)arg),person_in_transit->to);
+            move_to_floor(person_in_transit->e,person_in_transit->to);
             open_door(((Elevator*)arg));
             pthread_cond_signal(person_in_transit->cond);
             pthread_cond_wait(((Elevator*)arg)->cond, ((Elevator*)arg)->lock);
             pthread_mutex_unlock(((Elevator*)arg)->lock);
             close_door(((Elevator*)arg));
-        }
+
     }
     return NULL;
 }
