@@ -14,9 +14,11 @@
 // I stole this from you because its genius.
 #define mmalloc(type, count) ( type * ) malloc ((count) * sizeof(type))
 // this is needed to be globally but i can create a pointer to it. 
+
 typedef struct {
     pthread_cond_t *cond;    
     Dllist passengers;
+    int count;
 } Queue;
 
 void initialize_simulation(Elevator_Simulation *es)
@@ -26,6 +28,7 @@ void initialize_simulation(Elevator_Simulation *es)
     dll_empty(list->passengers);
     list->cond = mmalloc(pthread_cond_t, 1);
     pthread_cond_init(list->cond, NULL);
+    list->count = 0;
     (*es).v = list; 
 }
 
@@ -43,6 +46,7 @@ void wait_for_elevator(Person *p)
     // this is a critical section
     pthread_mutex_lock(p->es->lock);
     //append the list
+    ((Queue*)p->es->v)->count++;
     dll_append(((Queue*)p->es->v)->passengers, new_jval_v(p));
     //signal the elevators that some one is infact there;
     pthread_cond_signal(((Queue*)p->es->v)->cond);
@@ -85,25 +89,19 @@ void person_done(Person *p)
 //Thus, your final program that you hand in should not do any sleeping or any printing.
 void *elevator(void *arg)
 {
+    Person *person_in_transit;
     for(;;)
     {
-        pthread_mutex_lock(((Elevator*)arg)->es->lock);
 
-        Person *person_in_transit = (Person*)jval_v(dll_val(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers)));
-        if(!person_in_transit){
-            //check the global list.
-            // block until we know the list has something.
+        pthread_mutex_lock(((Elevator*)arg)->es->lock);
+        while (!((Queue*)((Elevator*)arg)->es->v)->count)
             pthread_cond_wait(((Queue*)((Elevator*)arg)->es->v)->cond, ((Elevator*)arg)->es->lock);
-            //copy the person
-            person_in_transit = (Person*)jval_v(dll_val(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers)));
-            // delete them from the wait queue.
-            dll_delete_node(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers));
-        }
-        else
-            dll_delete_node(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers));
         // unlock the critial section.
         pthread_mutex_unlock(((Elevator*)arg)->es->lock);
+        person_in_transit = (Person*)jval_v(dll_val(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers)));
+        dll_delete_node(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers));
         //move the elevator.
+        --((Queue*)((Elevator*)arg)->es->v)->count;
         person_in_transit->from == ((Elevator*)arg)->onfloor?:move_to_floor(((Elevator*)arg), person_in_transit->from);
         //open the door
         open_door(((Elevator*)arg));
