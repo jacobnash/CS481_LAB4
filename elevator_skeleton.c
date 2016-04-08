@@ -167,8 +167,8 @@ void get_off_elevator(Person *p)
         exit(1);
     }
     if (e->onfloor != p->to) {
-        fprintf(stderr, "Error at time %.3lf: %s %s get_off_elevator(%02d) - Elevator on wrong floor.\n",
-                finesleep_time(FINESLEEPER), p->fname, p->lname, e->id);
+        fprintf(stderr, "Error at time %.3lf: %s %s get_off_elevator(%02d) - Elevator on wrong floor: %02d.\n",
+                finesleep_time(FINESLEEPER), p->fname, p->lname, e->id, e->onfloor);
         exit(1);
     }
     dll_delete_node(p->ptr);
