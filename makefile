@@ -37,13 +37,13 @@ libfdr.a: $(LIBFDROBJS)
 
 clean:
 	rm -f core *.o $(EXECUTABLES) *~ libfdr.a
-test: elevator_part_1
-	./elevator_part_1 5 1 5 1 1 20 0 
-	./elevator_part_1 10 1 .1 .1 .1 12 0
+test: elevator_part_2
+	./elevator_part_2 5 1 5 1 1 20 0 
+	./elevator_part_2 10 1 .1 .1 .1 12 0
 	#test 2
-	./elevator_part_1 10 10 .01 .1 .1 12 0 
+	./elevator_part_2 10 10 .01 .1 .1 12 0 
 	#test 3
-	./elevator_part_1 10 10 .1 .01 .01 12 0
+	./elevator_part_2 10 10 .1 .01 .01 12 0
 	#test 4
 	./elevator_part_1 10 10 .05 .1 .1 12 0
 	#test 5

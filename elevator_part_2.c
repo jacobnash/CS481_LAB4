@@ -14,9 +14,11 @@
 // I stole this from you because its genius.
 #define mmalloc(type, count) ( type * ) malloc ((count) * sizeof(type))
 // this is needed to be globally but i can create a pointer to it. 
+
 typedef struct {
     pthread_cond_t *cond;    
     Dllist passengers;
+    int count;
 } Queue;
 
 void initialize_simulation(Elevator_Simulation *es)
@@ -26,6 +28,7 @@ void initialize_simulation(Elevator_Simulation *es)
     dll_empty(list->passengers);
     list->cond = mmalloc(pthread_cond_t, 1);
     pthread_cond_init(list->cond, NULL);
+    list->count = 0;
     (*es).v = list; 
 }
 
@@ -36,66 +39,201 @@ void initialize_elevator(Elevator *e)
 
 void initialize_person(Person *e)
 {
+
 }
 
 void wait_for_elevator(Person *p)
 {
-
-    dll_append( ((Queue*)p->es->v)->passengers, new_jval_v(p));
+    // this is a critical section
+    pthread_mutex_lock(p->es->lock);
+    //append the list
+    ((Queue*)p->es->v)->count++;
+    dll_append(((Queue*)p->es->v)->passengers, new_jval_v(p));
+    //signal the elevators that some one is infact there;
     pthread_cond_signal(((Queue*)p->es->v)->cond);
+    // remove the critical section
+    pthread_mutex_unlock(p->es->lock);
+    // block on the persons varible
+    pthread_mutex_lock(p->lock);
+    // wait for signal.
     pthread_cond_wait(p->cond, p->lock);
-    // Signal the condition variable for blocking elevators. Block on the person’s condition variable.
+    // unlock on signal.
+    pthread_mutex_unlock(p->lock);
 }
 
 void wait_to_get_off_elevator(Person *p)
 {
     //Unblock the elevator’s condition variable block on the person’s condition variable.
-    // block on the persons condtional
+    pthread_mutex_lock(p->e->lock);
     pthread_cond_signal(p->e->cond);
+    pthread_mutex_unlock(p->e->lock);
+    // block on the persons condtional
+    pthread_mutex_lock(p->lock);
     pthread_cond_wait(p->cond, p->lock);
+    pthread_mutex_unlock(p->lock);
 
 }
 
 void person_done(Person *p)
 {
-    //this is for line 49.
+    //signal to the elevator. 
+    pthread_mutex_lock(p->e->lock);
     pthread_cond_signal(p->e->cond);
+    pthread_mutex_unlock(p->e->lock);
 }
-//Each elevator is a while loop. 
-//Check the global list and if it’s empty, block on the condition variable for blocking elevators. 
-//When the elevator gets a person to service, it moves to the appropriate flo0or and opens its door. 
-//It puts itself into the person’s e field, then signals the person and blocks until the person wakes it up. 
-//When it wakes up, it goes to the person’s destination floor, opens its door, signals the person and blocks. 
-//When the person wakes it up, it closes its door and re-executes its while loop.
-//• Your elevator’s should call open door(), close door() from move to floor() appropriately. 
-//All sleeping and printing should be done in elevator skeleton.c. 
-//Thus, your final program that you hand in should not do any sleeping or any printing.
 void *elevator(void *arg)
 {
-    for (;;)
+    Person *person_in_transit;
+    Dllist  temp, loading;
+    loading = new_dllist();
+    Elevator *this_elevator = (Elevator*)arg;//tired of typeing that 
+    Queue *queue = (Queue*)this_elevator->es->v;
+    for(;;)
     {
-        pthread_mutex_lock(((Elevator*)arg)->es->lock);
-        Person *person_in_transit = (Person*)jval_v(dll_val(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers)));
-        if (!person_in_transit){
-            pthread_cond_wait(((Queue*)((Elevator*)arg)->es->v)->cond, ((Elevator*)arg)->es->lock);
-        } 
-        person_in_transit = (Person*)jval_v(dll_val(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers)));
-        dll_delete_node(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers));
-        pthread_mutex_unlock(((Elevator*)arg)->es->lock);
-        person_in_transit->from == ((Elevator*)arg)->onfloor?:move_to_floor(((Elevator*)arg), person_in_transit->from);
-        open_door(((Elevator*)arg));
-        person_in_transit->e = ((Elevator*)arg); 
-        pthread_cond_signal(person_in_transit->cond);
-        pthread_cond_wait(((Elevator*)arg)->cond, ((Elevator*)arg)->lock);
-        pthread_mutex_unlock(((Elevator*)arg)->lock);
-        close_door(((Elevator*)arg));
-        move_to_floor(person_in_transit->e,person_in_transit->to);
-        open_door(((Elevator*)arg));
-        pthread_cond_signal(person_in_transit->cond);
-        pthread_cond_wait(((Elevator*)arg)->cond, ((Elevator*)arg)->lock);
-        pthread_mutex_unlock(((Elevator*)arg)->lock);
-        close_door(((Elevator*)arg));
+        pthread_mutex_lock(this_elevator->es->lock);
+        while (!queue->count)
+            pthread_cond_wait(queue->cond, this_elevator->es->lock);
+        pthread_mutex_unlock(this_elevator->es->lock);
 
+        if(this_elevator->onfloor == 1)
+        {
+            while( this_elevator->onfloor != this_elevator->es->nfloors)
+            {
+                if(!dll_empty(queue->passengers))
+                {   
+                    dll_traverse(temp, queue->passengers)
+                    {
+                        pthread_mutex_lock(this_elevator->es->lock);
+                        if (((Person*)jval_v(dll_val(temp)))->from == this_elevator->onfloor){
+                            dll_append(loading, dll_val(temp));
+                            modify_dll_delete_node(temp);
+                            --queue->count;
+                        }
+                        pthread_mutex_unlock(this_elevator->es->lock);
+                    }
+                }
+                if(!dll_empty(loading))
+                {
+                    open_door(this_elevator);
+
+
+                    dll_traverse(temp, loading)
+                    {
+                        ((Person*)jval_v(dll_val(temp)))->e = this_elevator;
+                        pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
+                        pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
+                        pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock); 
+
+
+                    }
+                    dll_traverse(temp, loading)modify_dll_delete_node(temp);
+
+                    pthread_mutex_lock(this_elevator->lock);
+                    pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                    pthread_mutex_unlock(this_elevator->lock);
+
+                    close_door(this_elevator);
+                }
+                if(!dll_empty(this_elevator->people))
+                {
+                    dll_traverse(temp, this_elevator->people){
+                        if(this_elevator->onfloor == ((Person*)jval_v(dll_val(temp)))->to)
+                        {
+                            if (!this_elevator->door_open)
+                            {
+                                open_door(this_elevator);
+                            }
+                            pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
+                            pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
+                            pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock); 
+                        }
+                        if(this_elevator->door_open)
+                        {
+                            pthread_mutex_lock(this_elevator->lock);
+                            pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                            pthread_mutex_unlock(this_elevator->lock);
+
+                            close_door(this_elevator);
+                        }
+                    }
+
+                }
+                int tempe = this_elevator->onfloor;
+                if(++tempe<= this_elevator->es->nfloors){
+                    move_to_floor(this_elevator, tempe); 
+                    fprintf(stderr, " %i %i", this_elevator->onfloor,tempe);
+                }
+            }
+
+        }
+        else if(this_elevator->onfloor == this_elevator->es->nfloors)
+        {
+            while( this_elevator->onfloor != 1)
+            {
+                if(!dll_empty(queue->passengers))
+                {   
+                    dll_traverse(temp, queue->passengers)
+                    {
+                        pthread_mutex_lock(this_elevator->es->lock);
+                        if (((Person*)jval_v(dll_val(temp)))->from == this_elevator->onfloor){
+                            dll_append(loading, dll_val(temp));
+                            modify_dll_delete_node(temp);
+                            --queue->count;
+                        }
+                        pthread_mutex_unlock(this_elevator->es->lock);
+                    }
+                }
+                if(!dll_empty(loading))
+                {
+                    open_door(this_elevator);
+
+
+                    dll_traverse(temp, loading)
+                    {
+                        ((Person*)jval_v(dll_val(temp)))->e = this_elevator;
+                        pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
+                        pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
+                        pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock); 
+
+
+                    }
+                    dll_traverse(temp, loading)modify_dll_delete_node(temp);
+
+                    pthread_mutex_lock(this_elevator->lock);
+                    pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                    pthread_mutex_unlock(this_elevator->lock);
+
+                    close_door(this_elevator);
+                }
+                if(!dll_empty(this_elevator->people))
+                {
+                    dll_traverse(temp, this_elevator->people){
+                        if(this_elevator->onfloor == ((Person*)jval_v(dll_val(temp)))->to)
+                        {
+                            fprintf(stderr, " %i %i", this_elevator->onfloor,((Person*)jval_v(dll_val(temp)))->to);
+                            if (!this_elevator->door_open)
+                            {
+                                open_door(this_elevator);
+                            }
+                            pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
+                            pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
+                            pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock); 
+                        }
+                        if(this_elevator->door_open)
+                        {
+                            pthread_mutex_lock(this_elevator->lock);
+                            pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                            pthread_mutex_unlock(this_elevator->lock);
+
+                            close_door(this_elevator);
+                        }
+                    }
+
+                }
+                move_to_floor(this_elevator, --this_elevator->onfloor);
+
+            }
+
+        }
     }
-    return NULL;
 }

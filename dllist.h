@@ -54,6 +54,7 @@ extern dll_insert_b(Dllist, Jval);
 extern dll_insert_a(Dllist, Jval);
 
 extern dll_delete_node(Dllist);
+extern modify_dll_delete_node(Dllist);
 extern int dll_empty(Dllist);
 
 extern Jval dll_val(Dllist);

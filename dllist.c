@@ -91,6 +91,11 @@ dll_delete_node(Dllist node)		/* Deletes an arbitrary iterm */
   node->blink->flink = node->flink;
   free(node);
 }
+modify_dll_delete_node(Dllist node)		/* Deletes an arbitrary iterm */
+{
+  node->flink->blink = node->blink;
+  node->blink->flink = node->flink;
+}
 
 dll_empty(Dllist l)
 {
