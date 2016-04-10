@@ -96,11 +96,13 @@ void *elevator(void *arg)
         pthread_mutex_lock(((Elevator*)arg)->es->lock);
         while (!((Queue*)((Elevator*)arg)->es->v)->count)
             pthread_cond_wait(((Queue*)((Elevator*)arg)->es->v)->cond, ((Elevator*)arg)->es->lock);
+            if(!dll_empty(((Queue*)((Elevator*)arg)->es->v)->passengers)){
+             person_in_transit = (Person*)jval_v(dll_val(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers)));
+             dll_delete_node(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers));
+            }
         // unlock the critial section.
         pthread_mutex_unlock(((Elevator*)arg)->es->lock);
-        person_in_transit = (Person*)jval_v(dll_val(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers)));
-        dll_delete_node(dll_first(((Queue*)((Elevator*)arg)->es->v)->passengers));
-        //move the elevator.
+       //move the elevator.
         --((Queue*)((Elevator*)arg)->es->v)->count;
         person_in_transit->from == ((Elevator*)arg)->onfloor?:move_to_floor(((Elevator*)arg), person_in_transit->from);
         //open the door
