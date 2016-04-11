@@ -92,10 +92,10 @@ void *elevator(void *arg)
     for(;;)
     {
         //lock and wait for a signal. 
-        pthread_mutex_lock(this_elevator->es->lock);
-        while (!queue->count)
-            pthread_cond_wait(queue->cond, this_elevator->es->lock);
-        pthread_mutex_unlock(this_elevator->es->lock);
+//        pthread_mutex_lock(this_elevator->es->lock);
+//        while (!queue->count)
+//            pthread_cond_wait(queue->cond, this_elevator->es->lock);
+//        pthread_mutex_unlock(this_elevator->es->lock);
         //elevator is at the bottom of the building. 
         if(this_elevator->onfloor == 1)
         {
@@ -154,9 +154,13 @@ void *elevator(void *arg)
                         pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
                         pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
                         pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock);
+                 //       (this_elevator->v) = ((int*)this_elevator->v) + 1;
                         modify_dll_delete_node(temp);
                     }
                 }
+               // while(!this_elevator->v){
+                //    fprintf(stderr, "%i\n",((int*)this_elevator->v)[0]);
+               // }
                 if(this_elevator->door_open)
                 {
                     pthread_mutex_lock(this_elevator->lock);
@@ -229,9 +233,11 @@ void *elevator(void *arg)
                         pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
                         pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
                         pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock);
+                       // (this_elevator->v) = ((int*)this_elevator->v) + 1;
                         modify_dll_delete_node(temp);
                     }
                 }
+               //while(!this_elevator->v);
                 if(this_elevator->door_open)
                 {
                     pthread_mutex_lock(this_elevator->lock);
