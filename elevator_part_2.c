@@ -91,12 +91,6 @@ void *elevator(void *arg)
     Queue *queue = (Queue*)this_elevator->es->v;
     for(;;)
     {
-        //lock and wait for a signal. 
-//        pthread_mutex_lock(this_elevator->es->lock);
-//        while (!queue->count)
-//            pthread_cond_wait(queue->cond, this_elevator->es->lock);
-//        pthread_mutex_unlock(this_elevator->es->lock);
-        //elevator is at the bottom of the building. 
         if(this_elevator->onfloor == 1)
         {
             //while the elevator is not on the top floor scroll up.
@@ -123,7 +117,9 @@ void *elevator(void *arg)
                     //check if they are on the floor that the should be.
                     dll_traverse(temp, this_elevator->people)
                     {
-                        if(this_elevator->onfloor == ((Person*)jval_v(dll_val(temp)))->to)
+                        if(!dll_empty(this_elevator->people))
+                            break;
+                        else if(this_elevator->onfloor == ((Person*)jval_v(dll_val(temp)))->to)
                         {
                             //get them off the eleevator. 
                             if (!this_elevator->door_open)
@@ -133,6 +129,9 @@ void *elevator(void *arg)
                             pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
                             pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
                             pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock); 
+                            pthread_mutex_lock(this_elevator->lock);
+                            pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                            pthread_mutex_unlock(this_elevator->lock);
                         }
                         // if the door is open on that floor you should probably close it. 
                         // My grandfather used to tall me, "jake, you don't live in a barn."
@@ -154,18 +153,15 @@ void *elevator(void *arg)
                         pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
                         pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
                         pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock);
-                 //       (this_elevator->v) = ((int*)this_elevator->v) + 1;
-                        modify_dll_delete_node(temp);
+                        
+                        pthread_mutex_lock(this_elevator->lock);
+                        pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                        pthread_mutex_unlock(this_elevator->lock);
+                        dll_delete_node(temp);
                     }
                 }
-               // while(!this_elevator->v){
-                //    fprintf(stderr, "%i\n",((int*)this_elevator->v)[0]);
-               // }
                 if(this_elevator->door_open)
                 {
-                    pthread_mutex_lock(this_elevator->lock);
-                    pthread_cond_wait(this_elevator->cond, this_elevator->lock);
-                    pthread_mutex_unlock(this_elevator->lock);
                     close_door(this_elevator);
                 }
                 // this is where we go to the next floor. 
@@ -189,7 +185,7 @@ void *elevator(void *arg)
                         //lock it out and add them to the loading queue
                         if (((Person*)jval_v(dll_val(temp)))->from == this_elevator->onfloor && ((((Person*)jval_v(dll_val(temp)))->to - ((Person*)jval_v(dll_val(temp)))->from) < 0)){
                             dll_append(loading, dll_val(temp));
-                            modify_dll_delete_node(temp);
+                            dll_delete_node(temp);
                             --queue->count;
                         }
                     }
@@ -201,7 +197,9 @@ void *elevator(void *arg)
                     //check if they are on the floor that the should be.
                     dll_traverse(temp, this_elevator->people)
                     {
-                        if(this_elevator->onfloor == ((Person*)jval_v(dll_val(temp)))->to)
+                        if(!dll_empty(this_elevator->people))
+                            break;
+                        else if(this_elevator->onfloor == ((Person*)jval_v(dll_val(temp)))->to)
                         {
                             //get them off the eleevator. 
                             if (!this_elevator->door_open)
@@ -211,13 +209,16 @@ void *elevator(void *arg)
                             pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
                             pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
                             pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock);
+                            pthread_mutex_lock(this_elevator->lock);
+                            pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                            pthread_mutex_unlock(this_elevator->lock);
 
                         }
                         // if the door is open on that floor you should probably close it. 
                         // My grandfather used to tall me, "jake, you don't live in a barn."
                     }
                 }
-                // if there was some one that needed to be loaded on follow
+                // if there was some one that needed to be loaded on followa
                 if(!dll_empty(loading))
                 {
                     // open the door.
@@ -233,16 +234,16 @@ void *elevator(void *arg)
                         pthread_mutex_lock(((Person*)jval_v(dll_val(temp)))->lock);
                         pthread_cond_signal( ((Person*)jval_v(dll_val(temp)))->cond);
                         pthread_mutex_unlock(((Person*)jval_v(dll_val(temp)))->lock);
-                       // (this_elevator->v) = ((int*)this_elevator->v) + 1;
+                        // (this_elevator->v) = ((int*)this_elevator->v) + 1;
+                        pthread_mutex_lock(this_elevator->lock);
+                        pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                        pthread_mutex_unlock(this_elevator->lock);
                         modify_dll_delete_node(temp);
                     }
                 }
-               //while(!this_elevator->v);
+                //while(!this_elevator->v);
                 if(this_elevator->door_open)
                 {
-                    pthread_mutex_lock(this_elevator->lock);
-                    pthread_cond_wait(this_elevator->cond, this_elevator->lock);
-                    pthread_mutex_unlock(this_elevator->lock);
                     close_door(this_elevator);
                 }
                 // this is where we go to the next floor. 
