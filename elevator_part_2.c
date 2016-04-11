@@ -161,11 +161,7 @@ void *elevator(void *arg)
                 {
                     pthread_mutex_lock(this_elevator->lock);
                     pthread_cond_wait(this_elevator->cond, this_elevator->lock);
-                    pthread_mutex_lock(this_elevator->es->lock);
-                    pthread_cond_wait(queue->cond, this_elevator->es->lock);
                     pthread_mutex_unlock(this_elevator->lock);
-                    pthread_mutex_unlock(this_elevator->es->lock);
-                    fprintf(stderr, "");
                     close_door(this_elevator);
                 }
                 // this is where we go to the next floor. 
@@ -240,11 +236,7 @@ void *elevator(void *arg)
                 {
                     pthread_mutex_lock(this_elevator->lock);
                     pthread_cond_wait(this_elevator->cond, this_elevator->lock);
-                    pthread_mutex_lock(this_elevator->es->lock);
-                    pthread_cond_wait(queue->cond, this_elevator->es->lock);
                     pthread_mutex_unlock(this_elevator->lock);
-                    pthread_mutex_unlock(this_elevator->es->lock);
-                    fprintf(stderr, "");
                     close_door(this_elevator);
                 }
                 // this is where we go to the next floor. 
