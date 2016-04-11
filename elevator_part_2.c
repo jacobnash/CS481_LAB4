@@ -92,11 +92,10 @@ void *elevator(void *arg)
     for(;;)
     {
         //lock and wait for a signal. 
-        /*    pthread_mutex_lock(this_elevator->es->lock);
-              while (!queue->count)
-              pthread_cond_wait(queue->cond, this_elevator->es->lock);
-              pthread_mutex_unlock(this_elevator->es->lock);
-              */
+        pthread_mutex_lock(this_elevator->es->lock);
+        while (!queue->count)
+            pthread_cond_wait(queue->cond, this_elevator->es->lock);
+        pthread_mutex_unlock(this_elevator->es->lock);
         //elevator is at the bottom of the building. 
         if(this_elevator->onfloor == 1)
         {
@@ -162,7 +161,10 @@ void *elevator(void *arg)
                 {
                     pthread_mutex_lock(this_elevator->lock);
                     pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                    pthread_mutex_lock(this_elevator->es->lock);
+                    pthread_cond_wait(queue->cond, this_elevator->es->lock);
                     pthread_mutex_unlock(this_elevator->lock);
+                    pthread_mutex_unlock(this_elevator->es->lock);
                     fprintf(stderr, "");
                     close_door(this_elevator);
                 }
@@ -238,7 +240,10 @@ void *elevator(void *arg)
                 {
                     pthread_mutex_lock(this_elevator->lock);
                     pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                    pthread_mutex_lock(this_elevator->es->lock);
+                    pthread_cond_wait(queue->cond, this_elevator->es->lock);
                     pthread_mutex_unlock(this_elevator->lock);
+                    pthread_mutex_unlock(this_elevator->es->lock);
                     fprintf(stderr, "");
                     close_door(this_elevator);
                 }
