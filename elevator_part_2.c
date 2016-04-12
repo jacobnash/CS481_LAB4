@@ -18,7 +18,6 @@
 typedef struct {
     pthread_cond_t *cond;    
     Dllist passengers;
-    int count;
 } Queue;
 
 void initialize_simulation(Elevator_Simulation *es)
@@ -28,7 +27,6 @@ void initialize_simulation(Elevator_Simulation *es)
     dll_empty(list->passengers);
     list->cond = mmalloc(pthread_cond_t, 1);
     pthread_cond_init(list->cond, NULL);
-    list->count = 0;
     (*es).v = list; 
 }
 
@@ -47,7 +45,6 @@ void wait_for_elevator(Person *p)
     // this is a critical section
     pthread_mutex_lock(p->es->lock);
     //append the list
-    ((Queue*)p->es->v)->count++;
     dll_append(((Queue*)p->es->v)->passengers, new_jval_v(p));
     //signal the elevators that some one is infact there;
     pthread_cond_signal(((Queue*)p->es->v)->cond);
@@ -106,8 +103,7 @@ void *elevator(void *arg)
                         //lock it out and add them to the loading queue
                         if (((Person*)jval_v(dll_val(temp)))->from == this_elevator->onfloor && ((((Person*)jval_v(dll_val(temp)))->to - ((Person*)jval_v(dll_val(temp)))->from) > 0)){
                             dll_append(loading, dll_val(temp));
-                            modify_dll_delete_node(temp);
-                            --queue->count;
+                            dll_delete_node(temp);
                         }
                     }
                     pthread_mutex_unlock(this_elevator->es->lock);
@@ -194,7 +190,6 @@ void *elevator(void *arg)
                         if (((Person*)jval_v(dll_val(temp)))->from == this_elevator->onfloor && ((((Person*)jval_v(dll_val(temp)))->to - ((Person*)jval_v(dll_val(temp)))->from) < 0)){
                             dll_append(loading, dll_val(temp));
                             dll_delete_node(temp);
-                            --queue->count;
                         }
                     }
                     pthread_mutex_unlock(this_elevator->es->lock);
@@ -252,7 +247,7 @@ void *elevator(void *arg)
                         pthread_mutex_lock(this_elevator->lock);
                         pthread_cond_wait(this_elevator->cond, this_elevator->lock);
                         pthread_mutex_unlock(this_elevator->lock);
-                        modify_dll_delete_node(temp);
+                        dll_delete_node(temp);
                     }
                 }
                 //while(!this_elevator->v);
