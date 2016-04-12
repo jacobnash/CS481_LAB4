@@ -40,6 +40,7 @@ clean:
 test: elevator_part_2
 	touch test1.txt
 	rm test*
+	./elevator_part_2 10 1 .1 .1 .1 12 0 
 	./elevator_part_2 10 1 .1 .1 .1 12 0 >> test1.txt
 	./elevator_part_2 10 10 .01 .1 .1 12 0 >> test2.txt 
 	./elevator_part_2 10 10 .1 .01 .01 12 0 >> test3.txt
