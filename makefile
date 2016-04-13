@@ -1,5 +1,4 @@
 EXECUTABLES = elevator_null elevator_part_1 elevator_part_2 elevator_part_3 reorder double-check
-#EXECUTABLES = elevator_null reorder double-check
 
 CC = gcc
 LIBS = libfdr.a
@@ -39,7 +38,7 @@ libfdr.a: $(LIBFDROBJS)
 	ranlib libfdr.a 
 
 clean:
-	rm -f core *.o $(EXECUTABLES) *~ libfdr.a
+	rm -f core *.o $(EXECUTABLES) *~ libfdr.a test*
 test: elevator_part_3
 	touch test1.txt
 	rm test*

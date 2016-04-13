@@ -13,7 +13,8 @@
 #include "stdlib.h"
 // I stole this from you because its genius.
 #define mmalloc(type, count) ( type * ) malloc ((count) * sizeof(type))
-// this is needed to be globally but i can create a pointer to it. 
+// this is needed to be globally but i can create a pointer to it.
+int startfloor = 0;
 typedef struct { 
     Dllist *on_elevator;
 } Wait;
@@ -50,7 +51,7 @@ void initialize_elevator(Elevator *e)
     on_elevator->on_elevator = mmalloc(Dllist, e->es->nfloors);
     for ( i = 0; i < e->es->nfloors; i++)
         on_elevator->on_elevator[i] = new_dllist();
-    e->v = on_elevator;   
+    e->v = on_elevator;
 }
 
 void initialize_person(Person *e)
@@ -137,40 +138,39 @@ void *elevator(void *arg)
 
         }
         // get on the elevator.
+        if (pthread_mutex_trylock(&queue->locks[this_elevator->onfloor - 1]) == 0)
+        {
+            // try to get the lock if you can't its probably because some one is already on the floor. 
+            while(queue->passengers[d * this_elevator->es->nfloors + this_elevator->onfloor - 1]->flink != queue->passengers[d * this_elevator->es->nfloors + this_elevator->onfloor - 1])
+            { //get on the elevator.
+                if (!this_elevator->door_open)
+                {
+                    open_door(this_elevator);
+                }
+                person_in_transit = (Person*)jval_v(queue->passengers[d * this_elevator->es->nfloors +  this_elevator->onfloor - 1]->flink->val);
+                person_in_transit->e = this_elevator;
+                dll_append(this_elevator_queue[person_in_transit->to - 1], new_jval_v(person_in_transit));
+                dll_delete_node(queue->passengers[d * this_elevator->es->nfloors + this_elevator->onfloor - 1]->flink);
 
-
-        pthread_mutex_lock(&queue->locks[this_elevator->onfloor - 1]);
-        while(queue->passengers[d * this_elevator->es->nfloors + this_elevator->onfloor - 1]->flink != queue->passengers[d * this_elevator->es->nfloors + this_elevator->onfloor - 1])
-        { //get on the elevator.
-            if (!this_elevator->door_open)
-            {
-                open_door(this_elevator);
+                pthread_mutex_lock(person_in_transit->lock);
+                pthread_cond_signal(person_in_transit->cond);
+                pthread_mutex_unlock(person_in_transit->lock);
+                // have the elevator wait
+                pthread_mutex_lock(this_elevator->lock);
+                pthread_cond_wait(this_elevator->cond, this_elevator->lock);
+                pthread_mutex_unlock(this_elevator->lock);
             }
-            person_in_transit = (Person*)jval_v(queue->passengers[d * this_elevator->es->nfloors +  this_elevator->onfloor - 1]->flink->val);
-            person_in_transit->e = this_elevator;
-            dll_append(this_elevator_queue[person_in_transit->to - 1], new_jval_v(person_in_transit));
-            dll_delete_node(queue->passengers[d * this_elevator->es->nfloors + this_elevator->onfloor - 1]->flink);
-
-            pthread_mutex_lock(person_in_transit->lock);
-            pthread_cond_signal(person_in_transit->cond);
-            pthread_mutex_unlock(person_in_transit->lock);
-            // have the elevator wait
-            pthread_mutex_lock(this_elevator->lock);
-            pthread_cond_wait(this_elevator->cond, this_elevator->lock);
-            pthread_mutex_unlock(this_elevator->lock);
+            pthread_mutex_unlock(&queue->locks[this_elevator->onfloor - 1]);
         }
-        pthread_mutex_unlock(&queue->locks[this_elevator->onfloor - 1]);
         if (this_elevator->door_open)
         {
             close_door(this_elevator);
         }
-
-        move_to_floor(this_elevator, (this_elevator->onfloor + ( -2 * d + 1 ))); 
+        move_to_floor(this_elevator, (this_elevator->onfloor + ( 1 + (-2 * d)))); 
         if (this_elevator->onfloor == 1)
             d = 0;
         else if ( this_elevator->onfloor == this_elevator->es->nfloors)
             d = 1; 
-        // check to see if there are peeple in any of the queues on the floor above.
-                
+        // check to see if there are peeple in any of the queues on the floor above.                
     }
 }
